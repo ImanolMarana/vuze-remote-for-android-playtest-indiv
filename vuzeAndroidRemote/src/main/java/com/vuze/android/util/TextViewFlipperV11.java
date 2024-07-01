@@ -29,111 +29,148 @@ import com.vuze.util.Thunk;
 
 @TargetApi(Build.VERSION_CODES.HONEYCOMB)
 public class TextViewFlipperV11
-	extends TextViewFlipper
+        extends TextViewFlipper
 {
-	private final int animId;
+        private final int animId;
 
-	public TextViewFlipperV11() {
-		this.animId = R.animator.anim_field_change;
-	}
+        public TextViewFlipperV11() {
+                this.animId = R.animator.anim_field_change;
+        }
 
-	@Thunk
-	static String meh(View v) {
-		int id = v.getId();
-		return id == View.NO_ID ? ""
-				: v.getContext().getResources().getResourceEntryName(id);
-	}
+        @Thunk
+        static String meh(View v) {
+                int id = v.getId();
+                return id == View.NO_ID ? ""
+                                : v.getContext().getResources().getResourceEntryName(id);
+        }
 
-	/**
-	 * Change the text on repeat of Animation.
-	 *  @param tv Widget to update
-	 * @param newText New Text to set
-	 * @param animate false to set right away, true to wait
-	 * @param validator when animated, validator will be called to determine
-	 */
-	public boolean changeText(final TextView tv, final CharSequence newText,
-			boolean animate, final FlipValidator validator) {
-		if (DEBUG_FLIPPER) {
-			Log.d("flipper", meh(tv) + "] changeText: '" + newText + "';"
-					+ (animate ? "animate" : "now"));
-		}
-		if (!animate) {
-			tv.setText(newText);
-			tv.setVisibility(newText.length() == 0 ? View.GONE : View.VISIBLE);
-			return true;
-		}
-		if (!newText.toString().equals(tv.getText().toString())) {
-			flipIt(tv, new AnimatorListenerAdapter() {
+        /**
+         * Change the text on repeat of Animation.
+         *  @param tv Widget to update
+         * @param newText New Text to set
+         * @param animate false to set right away, true to wait
+         * @param validator when animated, validator will be called to determine
+         */
+        public boolean changeText(final TextView tv, final CharSequence newText,
+                        boolean animate, final FlipValidator validator) {
+                if (DEBUG_FLIPPER) {
+                        Log.d("flipper", meh(tv) + "] changeText: '" + newText + "';"
+                                        + (animate ? "animate" : "now"));
+                }
 
-				@Override
-				public void onAnimationEnd(Animator animation) {
-					if (validator != null && !validator.isStillValid()) {
-						if (DEBUG_FLIPPER) {
-							Log.d("flipper", meh(tv) + "] changeText: no longer valid");
-						}
-						return;
-					}
-					if (DEBUG_FLIPPER) {
-						Log.d("flipper", meh(tv) + "] changeText: setting to " + newText);
-					}
-					tv.setText(newText);
-					tv.setVisibility(newText.length() == 0 ? View.GONE : View.VISIBLE);
-				}
+                if (!animate) {
+                        setTextAndVisibility(tv, newText);
+                        return true;
+                }
 
-			});
-			return true;
-		} else {
-			if (DEBUG_FLIPPER) {
-				Log.d("flipper", meh(tv) + "] changeText: ALREADY " + newText);
-			}
-			return false;
-		}
-	}
+                if (!newText.toString().equals(tv.getText().toString())) {
+                        animateTextChange(tv, newText, validator);
+                        return true;
+                } else {
+                        if (DEBUG_FLIPPER) {
+                                Log.d("flipper", meh(tv) + "] changeText: ALREADY " + newText);
+                        }
+                        return false;
+                }
+        }
 
-	private void flipIt(View view, Animator.AnimatorListener l) {
-		AnimatorSet animation = (AnimatorSet) AnimatorInflater.loadAnimator(
-				view.getContext(), animId);
+        private void animateTextChange(final TextView tv, final CharSequence newText,
+                        final FlipValidator validator) {
+                flipIt(tv, new AnimatorListenerAdapter() {
+                        @Override
+                        public void onAnimationEnd(Animator animation) {
+                                if (validator != null && !validator.isStillValid()) {
+                                        if (DEBUG_FLIPPER) {
+                                                Log.d("flipper", meh(tv) + "] changeText: no longer valid");
+                                        }
+                                        return;
+                                }
+                                if (DEBUG_FLIPPER) {
+                                        Log.d("flipper", meh(tv) + "] changeText: setting to " + newText);
+                                }
+                                setTextAndVisibility(tv, newText);
+                        }
+                });
+        }
 
-		// Some Android versions won't animate when view is GONE
-		if (view.getVisibility() == View.GONE) {
-			if (DEBUG_FLIPPER) {
-				Log.d("flipper",
-						meh(view) + "] changeText: view gone.. need to make visible");
-			}
-			if (view instanceof TextView) {
-				// Some Android versions won't animate when text is ""
-				((TextView) view).setText(" ");
-			}
-			view.setVisibility(View.VISIBLE);
-		}
-		if (l != null) {
-			animation.getChildAnimations().get(0).addListener(l);
-		}
-		animation.setTarget(view);
-		animation.start();
-	}
+        private void setTextAndVisibility(TextView tv, CharSequence text) {
+                tv.setText(text);
+                tv.setVisibility(text.length() == 0 ? View.GONE : View.VISIBLE);
+        }
 
-	public void changeText(final TextView tv, final SpannableString newText,
-			boolean animate, final FlipValidator validator) {
-		String newTextString = newText.toString();
-		if (!animate || tv.getAnimation() != null) {
-			tv.setText(newText);
-			tv.setVisibility(newTextString.length() == 0 ? View.GONE : View.VISIBLE);
-			return;
-		}
-		if (!newTextString.equals(tv.getText().toString())) {
-			flipIt(tv, new AnimatorListenerAdapter() {
-				@Override
-				public void onAnimationEnd(Animator animation) {
-					if (validator != null && !validator.isStillValid()) {
-						return;
-					}
-					tv.setText(newText);
-					tv.setVisibility(
-							newText.toString().length() == 0 ? View.GONE : View.VISIBLE);
-				}
-			});
-		}
-	}
+        private void flipIt(View view, Animator.AnimatorListener l) {
+                AnimatorSet animation = (AnimatorSet) AnimatorInflater.loadAnimator(
+                                view.getContext(), animId);
+
+                ensureViewVisibleForAnimation(view);
+
+                if (l != null) {
+                        animation.getChildAnimations().get(0).addListener(l);
+                }
+                animation.setTarget(view);
+                animation.start();
+        }
+
+        private void ensureViewVisibleForAnimation(View view) {
+                if (view.getVisibility() == View.GONE) {
+                        if (DEBUG_FLIPPER) {
+                                Log.d("flipper",
+                                                meh(view) + "] changeText: view gone.. need to make visible");
+                        }
+                        if (view instanceof TextView) {
+                                ((TextView) view).setText(" ");
+                        }
+                        view.setVisibility(View.VISIBLE);
+                }
+        }
+
+//Refactoring end
+        }
+
+        private void flipIt(View view, Animator.AnimatorListener l) {
+                AnimatorSet animation = (AnimatorSet) AnimatorInflater.loadAnimator(
+                                view.getContext(), animId);
+
+                // Some Android versions won't animate when view is GONE
+                if (view.getVisibility() == View.GONE) {
+                        if (DEBUG_FLIPPER) {
+                                Log.d("flipper",
+                                                meh(view) + "] changeText: view gone.. need to make visible");
+                        }
+                        if (view instanceof TextView) {
+                                // Some Android versions won't animate when text is ""
+                                ((TextView) view).setText(" ");
+                        }
+                        view.setVisibility(View.VISIBLE);
+                }
+                if (l != null) {
+                        animation.getChildAnimations().get(0).addListener(l);
+                }
+                animation.setTarget(view);
+                animation.start();
+        }
+
+        public void changeText(final TextView tv, final SpannableString newText,
+                        boolean animate, final FlipValidator validator) {
+                String newTextString = newText.toString();
+                if (!animate || tv.getAnimation() != null) {
+                        tv.setText(newText);
+                        tv.setVisibility(newTextString.length() == 0 ? View.GONE : View.VISIBLE);
+                        return;
+                }
+                if (!newTextString.equals(tv.getText().toString())) {
+                        flipIt(tv, new AnimatorListenerAdapter() {
+                                @Override
+                                public void onAnimationEnd(Animator animation) {
+                                        if (validator != null && !validator.isStillValid()) {
+                                                return;
+                                        }
+                                        tv.setText(newText);
+                                        tv.setVisibility(
+                                                        newText.toString().length() == 0 ? View.GONE : View.VISIBLE);
+                                }
+                        });
+                }
+        }
 
 }
